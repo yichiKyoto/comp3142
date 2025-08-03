@@ -1,0 +1,7 @@
+seeds_folder = 'test/in'
+
+output_folder = 'test/out'
+
+target = 'test/mjs_main_afl_cfast'
+
+target_args = ['@@']
