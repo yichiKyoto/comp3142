@@ -14,3 +14,6 @@ class Seed:
 
     def unmark_favored(self):
         self.favored = 0
+
+    def __repr__(self):
+        return f"Seed(path='{self.path}')"

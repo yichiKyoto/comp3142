@@ -1,12 +1,11 @@
 import ctypes
 import sys
 import sysv_ipc
-import coverage_data
 
 SHM_ENV_VAR   = "__AFL_SHM_ID"
 MAP_SIZE_POW2 = 16
 MAP_SIZE = (1 << MAP_SIZE_POW2)
-
+global_bitmap = bytearray(MAP_SIZE)
 
 
 def setup_shm(libc):
@@ -59,28 +58,43 @@ def check_crash(status_code):
     return crashed
 
 
-def check_coverage(trace_bits, seed):
-    raw_bitmap = ctypes.string_at(trace_bits, MAP_SIZE)
-    total_hits = 0
-    new_edge_covered = False
+# def check_coverage(trace_bits):
+#     raw_bitmap = ctypes.string_at(trace_bits, MAP_SIZE)
+#     total_hits = 0
+#     new_edge_covered = False
+#
+#     for edge_num, value in enumerate(raw_bitmap):
+#
+#         if value != 0:
+#             total_hits += 1
+#             if not global_bitmap[edge_num]:
+#                 new_edge_covered = True
+#             global_bitmap[edge_num] = 1
+#
+#     return new_edge_covered, total_hits
 
-    for edgeNum, value in enumerate(raw_bitmap):
+
+def check_coverage(trace_bits):
+    raw_bitmap = ctypes.string_at(trace_bits, MAP_SIZE)
+    num_edges_covered = 0
+    new_edges_found = 0
+
+    for edge_num in range(MAP_SIZE):
         # TODO: maintain a global coverage of all seeds, check if this seed covers a new edge
-        if value != 0:
-            coverage_data.add_to_favoured_seeds(edgeNum, seed)
-            if coverage_data.global_bitmap[value] == 0:
-                new_edge_covered = True
-            coverage_data.global_bitmap[value] = 1
-            total_hits += 1
-    print(f'covered {total_hits} edges')
+        value = raw_bitmap[edge_num]
 
-    return new_edge_covered, total_hits
+        if value:  # Edge was hit in this run
+            num_edges_covered += 1
 
-def check_total_hits(trace_bits):
-    raw_bitmap = ctypes.string_at(trace_bits, MAP_SIZE)
-    total_hits = 0
-    for i in raw_bitmap:
-        if i != 0:
-            total_hits += 1
-    print(f'covered {total_hits} edges')
-    return total_hits
+            # Track if this edge is newly discovered
+            if not global_bitmap[edge_num]:
+                new_edges_found += 1
+
+            # Update global hit count
+            new_count = global_bitmap[edge_num] + value
+            global_bitmap[edge_num] = min(new_count, 255)
+
+    return (new_edges_found > 0), num_edges_covered
+
+
+

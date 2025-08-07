@@ -9,11 +9,11 @@ from execution import *
 from seed import *
 from schedule import *
 from mutation import *
-import coverage_data
 
 
 FORKSRV_FD = 198
 
+# appended_seeds = set()
 
 # listen for user's signal
 def signal_handler(sig, frame):
@@ -39,14 +39,14 @@ def run_forkserver(conf, ctl_read_fd, st_write_fd):
 
 
 def run_fuzzing(conf, st_read_fd, ctl_write_fd, trace_bits):
-    print("run_fuzzing")
+    # global appended_seeds
     read_bytes = os.read(st_read_fd, 4)
     if len(read_bytes) == 4:
         print("forkserver is up! starting fuzzing... press Ctrl+C to stop")
 
     crash_queue = []
     seed_queue = []
-    visited = {}
+    paths_covered = 0
     # do the dry run, check if the target is working and initialize the seed queue
     shutil.copytree(conf['seeds_folder'], conf['queue_folder'])
     for i, seed_file in enumerate(os.listdir(conf['queue_folder'])):
@@ -64,28 +64,32 @@ def run_fuzzing(conf, st_read_fd, ctl_write_fd, trace_bits):
             print(f"Seed {seed_file} caused a crash during the dry run")
             sys.exit(0)
 
-        coverage = check_total_hits(trace_bits)
 
+        new_edge_covered, coverage = check_coverage(trace_bits)
         new_seed = Seed(seed_path, i, coverage, exec_time)
+        process_edges(trace_bits, new_seed)
 
+
+        if new_edge_covered:
+            paths_covered += 1
         seed_queue.append(new_seed)
-        visited[new_seed] = False
 
-    coverage_data.global_bitmap = [0] * MAP_SIZE
-    total_coverage = 0
     avg_bitmap_size = calculate_avg_bitmap(seed_queue)
     avg_exec_time = calculate_avg_exec_time(seed_queue)
+
     print("Dry run finished. Now starting the fuzzing loop...")
     # start the fuzzing loop
     while True:
-        selected_seed = select_next_seed(seed_queue, visited)
-
+        selected_seed = select_next_seed(seed_queue)
+        # if selected_seed in appended_seeds:
+        #     print(f"selected seed {selected_seed}")
         power_schedule = get_power_schedule(selected_seed, avg_exec_time, avg_bitmap_size)
-
+        # print("power scheduling finished")
         # generate new test inputs according to the power schedule for the selected seed
         for i in range(0, power_schedule):
             # TODO: implement the strategy for selecting a mutation operator
             havoc_mutation(conf, selected_seed)
+            # print("havoc mutation finished")
             # run the target with the mutated seed
             status_code, exec_time = run_target(ctl_write_fd, st_read_fd, trace_bits)
 
@@ -105,16 +109,21 @@ def run_fuzzing(conf, st_read_fd, ctl_write_fd, trace_bits):
 
                 continue
 
-            new_edge_covered, coverage = check_coverage(trace_bits, selected_seed)
+            new_edge_covered, coverage = check_coverage(trace_bits)
+
 
             if new_edge_covered:
-                total_coverage += 1
+                print("Found new coverage!")
+                paths_covered += 1
+                full_path = os.path.join(conf['queue_folder'], f"seed{str(len(seed_queue))}")
                 # TODO: save the current test input as a new seed
-                # full_path = os.path.join(conf['queue_folder'], selected_seed.path)
-                # with open(full_path, 'w') as f:
-                #     pass
-                # continue
-            print(f"total_coverage: {total_coverage}")
+                shutil.copyfile(conf['current_input'], full_path)
+                new_seed = Seed(full_path, len(seed_queue), coverage, exec_time)
+                process_edges(trace_bits, new_seed)
+                seed_queue.append(new_seed)
+                # appended_seeds.add(new_seed)
+
+        print(f"paths_covered: {str(paths_covered)}")
 
 
 def main():
