@@ -1,0 +1,3 @@
+length,width,height,result
+10,1000,1000,True
+10,1828,1739,False

@@ -6,7 +6,7 @@ SHM_ENV_VAR   = "__AFL_SHM_ID"
 MAP_SIZE_POW2 = 16
 MAP_SIZE = (1 << MAP_SIZE_POW2)
 global_bitmap = bytearray(MAP_SIZE)
-
+total_edges_covered = 0
 
 def setup_shm(libc):
     # map functions
@@ -58,43 +58,24 @@ def check_crash(status_code):
     return crashed
 
 
-# def check_coverage(trace_bits):
-#     raw_bitmap = ctypes.string_at(trace_bits, MAP_SIZE)
-#     total_hits = 0
-#     new_edge_covered = False
-#
-#     for edge_num, value in enumerate(raw_bitmap):
-#
-#         if value != 0:
-#             total_hits += 1
-#             if not global_bitmap[edge_num]:
-#                 new_edge_covered = True
-#             global_bitmap[edge_num] = 1
-#
-#     return new_edge_covered, total_hits
-
-
 def check_coverage(trace_bits):
+    global total_edges_covered
     raw_bitmap = ctypes.string_at(trace_bits, MAP_SIZE)
-    num_edges_covered = 0
-    new_edges_found = 0
+    total_hits = 0
+    new_edge_covered = False
 
-    for edge_num in range(MAP_SIZE):
+    for edge_num, value in enumerate(raw_bitmap):
         # TODO: maintain a global coverage of all seeds, check if this seed covers a new edge
-        value = raw_bitmap[edge_num]
-
-        if value:  # Edge was hit in this run
-            num_edges_covered += 1
-
-            # Track if this edge is newly discovered
+        if value != 0:
+            total_hits += 1
             if not global_bitmap[edge_num]:
-                new_edges_found += 1
+                total_edges_covered += 1
+                new_edge_covered = True
+            global_bitmap[edge_num] = 1
 
-            # Update global hit count
-            new_count = global_bitmap[edge_num] + value
-            global_bitmap[edge_num] = min(new_count, 255)
-
-    return (new_edges_found > 0), num_edges_covered
+    print(f'covered {total_hits} edges')
+    print(f"total edges covered: {total_edges_covered}")
+    return new_edge_covered, total_hits
 
 
 

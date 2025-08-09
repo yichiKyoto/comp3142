@@ -56,7 +56,6 @@ def mutation1(data, data_len, valid_sizes):
     if not valid_sizes:
         return data_len
 
-
     size = random.choice(valid_sizes)
     byte_index = random.randint(0, data_len - size)
 
@@ -79,7 +78,6 @@ def mutation1(data, data_len, valid_sizes):
 def mutation2(data, data_len, valid_sizes):
     if not valid_sizes:
         return data_len
-
 
     size = random.choice(valid_sizes)
     byte_index = random.randint(0, data_len - size)
@@ -104,7 +102,6 @@ def mutation3(data, data_len, valid_sizes):
     byte_index = random.randint(0, data_len - size)
     other_byte_index = random.randint(0, data_len - size)
 
-    # Handle overlapping regions safely
     chunk1 = bytearray(data[byte_index:byte_index + size])
     chunk2 = bytearray(data[other_byte_index:other_byte_index + size])
 
@@ -134,6 +131,5 @@ def mutation5(data, data_len, valid_sizes):
 
     byte_index = random.randint(0, data_len - size)
 
-    # Efficient deletion
     del data[byte_index:byte_index + size]
     return data_len - size  # Return new length
